@@ -19,7 +19,7 @@ public:
     int   power;
 };
 
-namespace LoRa_Utils {
+namespace LoRa {
 
     void setFlag();
     void changeFreq();

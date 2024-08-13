@@ -3,17 +3,23 @@
 
 long freq1 = 433775000;
 long freq2 = 439912500;
+bool disableGPS = true;
+bool disableLoRa = true;
+bool disableDisplay = false;
+bool disableSD = false;
+bool disableSensor = false;
 
-extern LoraType loraTypes[2];
-uint8_t loraIndex;
+String defaultFilename = "test.txt";
+
+static LoraType loraTypes[2];
 int loraIndexSize = 2;
 
 LoraType* getLoraTypes() {
     return loraTypes;
 }
 
-LoraType getLoraType() {
-    return loraTypes[loraIndex];
+LoraType* getLoraType(uint8_t loraIndex) {
+    return &loraTypes[loraIndex];
 }
 
 void initLoRaTypes() {

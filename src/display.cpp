@@ -1,5 +1,5 @@
-
 #include <U8g2lib.h>
+#include "config.h"
 
 #ifdef TTGO_T_LORA32_V2_1_GPS
     #define OLED_SCL 22
@@ -11,6 +11,8 @@
     #define OLED_SDA 17
     U8G2_SH1106_128X64_NONAME_1_SW_I2C(U8G2_R0, OLED_SCL, OLED_SDA, U8X8_PIN_NONE);
 #endif
+
+extern bool disableDisplay;
 
 void setup_display() {
     u8g2.begin();
@@ -29,7 +31,12 @@ void display_toggle(bool toggle) {
     }
 }
 
+//maybe add a function to display lien with cursor position
+
 void show_display(const String& header, const String& line1, const String& line2, int wait = 0) {
+    if(disableDisplay) {
+        return;
+    }
     u8g2.clearBuffer();
     u8g2.setCursor(0, 10);
     u8g2.print(header);
@@ -42,6 +49,9 @@ void show_display(const String& header, const String& line1, const String& line2
 }
 
 void show_display(const String& header, const String& line1, const String& line2, const String& line3, const String& line4, const String& line5, int wait = 0) {
+    if(disableDisplay) {
+        return;
+    }
     u8g2.clearBuffer();
     u8g2.setCursor(0, 10);
     u8g2.print(header);
@@ -59,7 +69,7 @@ void show_display(const String& header, const String& line1, const String& line2
     delay(wait);
 }
 
-void startupScreen(const String &version) {
-    show_display(" WeatherSta.", "      ", "443mHz", " Wifi: OFF", " BT: OFF", "  v"+version, 1500);
+void startupScreen(const float &version) {
+    show_display(" WeatherSta.", "      ", "443mHz", " Wifi: OFF", " BT: OFF", "  v" + String(version), 1500);
 }
 

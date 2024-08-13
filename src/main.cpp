@@ -1,39 +1,75 @@
 #include <Arduino.h>
 #include <SensirionI2cSht4x.h>
 #include <Wire.h>
-#include "power.h"
-#include <WiFi.h>
+#include <logger.h>
 #include <esp_bt.h>
 #include <BluetoothSerial.h>
 #include <SensirionI2cSht4x.h>
+#include <WiFi.h>
 #include <Wire.h>
+#include "power.h"
 #include "display.h"
 #include "sht40.h"
 #include "lora.h"
+#include "sdcard.h"
+#include "config.h"
 
-long freq1 = 433775000;
-long freq2 = 439912500;
+float version = 1.0;
+logging::Logger logger;
+//#define DEBUG
 
-SensirionI2cSht4x sensor;
-extern BluetoothSerial  SerialBT;
+extern String defaultFilename;
+extern bool disableLoRa;
+extern bool disableDisplay;
+extern bool disableSD;
+extern bool disableSensor;
 
 void setup() { 
   Serial.begin(115200);
-  POWER::setup();
-  setup_display();
-  WiFi.mode(WIFI_OFF);
-  esp_bt_controller_disable();
-  setup_sensor();
-  display_toggle(true);
 
-  #ifdef LORA_ENABLED
-    initLoRaTypes(); 
+  #ifndef DEBUG
+      logger.setDebugLevel(logging::LoggerLevel::LOGGER_LEVEL_INFO);
   #endif
 
-  startupScreen("1.0");
+  pinMode(LED_BUILTIN, OUTPUT);
+  POWER::setup();
+  
+  if(disableDisplay) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Display", "Display is disabled");
+  } else {
+    setup_display();
+    display_toggle(true);
+  }
+
+  WiFi.mode(WIFI_OFF);
+  esp_bt_controller_disable();
+
+  if(disableSensor) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Sensor", "Sensor is disabled");
+  } else {
+    SHT40::setup();
+  }
+
+  if(disableSD) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "SD is disabled");
+  } else {
+    SDCARD::setup();
+    SDCARD::cardInfo();
+    SDCARD::setDefaultFilename("test.txt");
+  }
+
+  if(disableLoRa) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "LoRa", "LoRa is disabled");
+  } else {
+    initLoRaTypes(); 
+  }
+
+  startupScreen(version);
   POWER::lowerCpuFrequency();
 }
 
 void loop() {
+  SHT40::loop();
+  SDCARD::loop();	
   POWER::batteryManager();
 }

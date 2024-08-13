@@ -7,7 +7,7 @@
 #include "config.h"
 
 extern logging::Logger  logger;
-LoraType         *currentLoRaType;
+LoraType*          currentLoRaType;
 extern uint8_t    loraIndex;
 extern int        loraIndexSize;
 
@@ -27,7 +27,7 @@ bool transmitFlag    = true;
     SX1276 radio = new Module(RADIO_CS_PIN, RADIO_BUSY_PIN, RADIO_RST_PIN);
 #endif
 
-namespace LoRa_Utils {
+namespace LoRa {
 
     void setFlag(void) {
         operationDone = true;
@@ -39,7 +39,7 @@ namespace LoRa_Utils {
         } else {
             loraIndex++;
         }
-        currentLoRaType = &getLoraType(loraIndex);
+        currentLoRaType = getLoraType(loraIndex);
 
         float freq = (float)currentLoRaType->frequency/1000000;
         radio.setFrequency(freq);

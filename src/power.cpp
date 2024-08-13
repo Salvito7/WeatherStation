@@ -1,12 +1,10 @@
 #include <SPI.h>
-#include "notification_utils.h"
-#include "configuration.h"
+#include "config.h"
 #include "boards_pinout.h"
-#include "power_utils.h"
-#include "lora_utils.h"
-#include "ble_utils.h"
+#include "power.h"
+#include "lora.h"
 #include "display.h"
-#include <logger.h>
+#include "logger.h"
 
     #define I2C_SDA 21
     #define I2C_SCL 22
@@ -27,8 +25,6 @@
     XPowersAXP2101 PMU;
 #endif
 
-
-extern Configuration    Config;
 extern logging::Logger  logger;
 extern bool             transmitFlag;
 
@@ -36,12 +32,13 @@ uint32_t    batteryMeasurmentTime   = 0;
 
 bool        pmuInterrupt;
 float       lora32BatReadingCorr    = 6.5; // % of correction to higher value to reflect the real battery voltage (adjust this to your needs)
-bool        disableGPS;
+extern bool disableGPS;
+extern bool disableLoRa;
 
 
-namespace POWER_Utils {
 
-    bool   BatteryIsConnected = false;
+namespace POWER {
+
     String batteryVoltage = "";
     String batteryChargeDischargeCurrent = "";
 
@@ -88,10 +85,6 @@ namespace POWER_Utils {
 
     const String getBatteryInfoCurrent() {
         return batteryChargeDischargeCurrent;
-    }
-
-    bool getBatteryInfoIsConnected() {
-        return BatteryIsConnected;
     }
 
     void enableChgLed() {
@@ -152,8 +145,7 @@ namespace POWER_Utils {
     void obtainBatteryInfo() {
         static unsigned int rate_limit_check_battery = 0;
         if (!(rate_limit_check_battery++ % 60))
-            BatteryIsConnected = isBatteryConnected();
-        if (BatteryIsConnected) {
+        if (isBatteryConnected()) {
             #ifdef HAS_AXP2101
                 batteryVoltage       = String(PMU.getBattVoltage());
             #else
@@ -300,8 +292,6 @@ namespace POWER_Utils {
     void setup() {
         #ifdef HAS_NO_GPS
             disableGPS = true;
-        #else
-            disableGPS = Config.disableGPS;
         #endif
 
         #ifdef HAS_AXP192
@@ -311,6 +301,7 @@ namespace POWER_Utils {
             } else {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "AXP192", "init failed!");
             }
+            if()
             activateLoRa();
             if (disableGPS) {
                 deactivateGPS();
@@ -409,22 +400,15 @@ namespace POWER_Utils {
     void shutdown() {
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "Main", "SHUTDOWN !!!");
         #if defined(HAS_AXP192) || defined(HAS_AXP2101)
-            if (Config.notification.shutDownBeep) NOTIFICATION_Utils::shutDownBeep();
             display_toggle(false);
             PMU.shutdown();
         #else
 
-            if (Config.bluetoothType == 0 || Config.bluetoothType == 2) {
-                BLE_Utils::stop();
-            } else {
-                // turn off BT classic ???
-            }
+            LoRa::sleepRadio();
 
-            LoRa_Utils::sleepRadio();
-
-            long DEEP_SLEEP_TIME_SEC = 1296000; // 30 days
+            long DEEP_SLEEP_TIME_SEC = 86400; // 1 day
             esp_sleep_enable_timer_wakeup(1000000ULL * DEEP_SLEEP_TIME_SEC);
-            delay(500);           
+            delay(500);
             esp_deep_sleep_start();
         #endif
     }
