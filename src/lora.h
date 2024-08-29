@@ -1,6 +1,7 @@
-#ifndef LORA_UTILS_H_
-#define LORA_UTILS_H_
+#ifndef NO_LORA
 
+#ifndef LORA_H
+#define LORA_H
 #include <Arduino.h>
 
 struct ReceivedLoRaPacket {
@@ -31,5 +32,5 @@ namespace LoRa {
     void sleepRadio();
 
 }
-
+#endif
 #endif

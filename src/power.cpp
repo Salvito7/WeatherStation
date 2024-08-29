@@ -2,13 +2,14 @@
 #include "config.h"
 #include "boards_pinout.h"
 #include "power.h"
-#include "lora.h"
 #include "display.h"
 #include "logger.h"
 
+#if !defined(TTGO_T_Beam_S3_SUPREME_V3)
     #define I2C_SDA 21
     #define I2C_SCL 22
     #define IRQ_PIN 35
+#endif
 
 #ifdef TTGO_T_Beam_S3_SUPREME_V3
     #define I2C0_SDA 17
@@ -35,11 +36,9 @@ float       lora32BatReadingCorr    = 6.5; // % of correction to higher value to
 extern bool disableGPS;
 extern bool disableLoRa;
 
-
-
 namespace POWER {
 
-    String batteryVoltage = "";
+    static String batteryVoltage = "";
     String batteryChargeDischargeCurrent = "";
 
     double getBatteryVoltage() {
@@ -65,9 +64,10 @@ namespace POWER {
                 #endif
                 batteryMeasurmentTime = millis();
             #endif
-                double voltage = (adc_value * 3.3 ) / 4095.0;
-            #if defined(TTGO_T_Beam_V0_7) || defined(TTGO_T_LORA32_V2_1_GPS) || defined(TTGO_T_LORA32_V2_1_GPS_915) || defined(TTGO_T_LORA32_V2_1_TNC) || defined(TTGO_T_LORA32_V2_1_TNC_915) || defined(ESP32_DIY_LoRa_GPS) || defined(ESP32_DIY_LoRa_GPS_915) || defined(ESP32_DIY_1W_LoRa_GPS) || defined(ESP32_DIY_1W_LoRa_GPS_915) || defined(OE5HWN_MeshCom) || defined(TTGO_T_DECK_GPS)
-                return (2 * (voltage + 0.1)) * (1 + (lora32BatReadingCorr/100)); // (2 x 100k voltage divider) 2 x voltage divider/+0.1 because ESP32 nonlinearity ~100mV ADC offset/extra correction
+                double voltage = (adc_value / 4096.0) * 3.3; //gets the voltage after the 10k + 10k voltage divider. Equals to ~1/2 of the real voltage
+
+            #if defined(TTGO_T_Beam_V0_7) || defined(TTGO_T_LORA32_V2_1) || defined(TTGO_T_LORA32_V2_1_915) || defined(TTGO_T_LORA32_V2_1_TNC) || defined(TTGO_T_LORA32_V2_1_TNC_915) || defined(ESP32_DIY) || defined(ESP32_DIY_LoRa_GPS_915) || defined(ESP32_DIY_1W_LoRa_GPS) || defined(ESP32_DIY_1W_LoRa_GPS_915) || defined(OE5HWN_MeshCom) || defined(TTGO_T_DECK_GPS)
+                return (2 * (voltage + 0.1)) * (1 + (lora32BatReadingCorr/100)); //voltage +0.1 = ~100mV ADC offset because of the nonlinearity of the ESP32 ADC. 6.5% correction because of the voltage divider resistors tolerance
             #endif
             #if defined(HELTEC_V3_GPS) || defined(HELTEC_WIRELESS_TRACKER) || defined(ESP32_C3_DIY_LoRa_GPS) || defined(ESP32_C3_DIY_LoRa_GPS_915) || defined(WEMOS_ESP32_Bat_LoRa_GPS)
                 double inputDivider = (1.0 / (390.0 + 100.0)) * 100.0;  // The voltage divider is a 390k + 100k resistor in series, 100k on the low side. 
@@ -143,8 +143,8 @@ namespace POWER {
     }
 
     void obtainBatteryInfo() {
-        static unsigned int rate_limit_check_battery = 0;
-        if (!(rate_limit_check_battery++ % 60))
+      //  static unsigned int rate_limit_check_battery = 0;
+      //  if (!(rate_limit_check_battery++ % 5))
         if (isBatteryConnected()) {
             #ifdef HAS_AXP2101
                 batteryVoltage       = String(PMU.getBattVoltage());
@@ -152,6 +152,7 @@ namespace POWER {
                 batteryVoltage       = String(getBatteryVoltage(), 2);
             #endif
             batteryChargeDischargeCurrent = String(getBatteryChargeDischargeCurrent(), 0);
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "PWR", String(getBatteryVoltage()).c_str());
         }
     }
 
@@ -159,7 +160,15 @@ namespace POWER {
         #ifdef ADC_CTRL
             if(batteryMeasurmentTime == 0 || (millis() - batteryMeasurmentTime) > 30 * 1000) obtainBatteryInfo();
         #else
-            obtainBatteryInfo();
+            unsigned long now = millis();
+            static unsigned long lastMillis = 0;
+
+            if ((now - lastMillis) >= 5000) {
+                obtainBatteryInfo();
+                lastMillis = now;
+            }
+
+    
         #endif
         #if defined(HAS_AXP192) || defined(HAS_AXP2101)
             handleChargingLed();
@@ -344,8 +353,12 @@ namespace POWER {
             PMU.setSysPowerDownVoltage(2600);
         #endif
 
-        #ifdef BATTERY_PIN
-            pinMode(BATTERY_PIN, INPUT);
+        #if defined(BATTERY_PIN) && defined(ESP32_DIY)
+            pinMode(BATTERY_PIN, ANALOG);
+        #else
+            #ifdef BATTERY_PIN
+                pinMode(BATTERY_PIN, INPUT);
+            #endif
         #endif
 
         #ifdef VEXT_CTRL
@@ -391,22 +404,24 @@ namespace POWER {
 
     void lowerCpuFrequency() {
         if (setCpuFrequencyMhz(80)) {
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "Main", "CPU frequency set to 80MHz");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "PWR", "CPU frequency set to 80MHz");
         } else {
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "Main", "CPU frequency unchanged");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "PWR", "CPU frequency unchanged");
         }
     }
 
     void shutdown() {
-        logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "Main", "SHUTDOWN !!!");
+        logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "PWR", "SHUTDOWN !!!");
         #if defined(HAS_AXP192) || defined(HAS_AXP2101)
             display_toggle(false);
             PMU.shutdown();
         #else
+            #ifndef NO_LORA
+                #include "lora.h"
+                LoRa::sleepRadio();
+            #endif
 
-            LoRa::sleepRadio();
-
-            long DEEP_SLEEP_TIME_SEC = 86400; // 1 day
+            long DEEP_SLEEP_TIME_SEC = 14400; // 4h
             esp_sleep_enable_timer_wakeup(1000000ULL * DEEP_SLEEP_TIME_SEC);
             delay(500);
             esp_deep_sleep_start();

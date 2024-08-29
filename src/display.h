@@ -1,7 +1,11 @@
-#ifndef DISPLAY_H_
-#define DISPLAY_H_
+
+#ifndef NO_DISPLAY
+#ifndef DISPLAY_H
+#define DISPLAY_H
 
 void setup_display();
+void loop_display();
+void display_clear();
 void display_toggle(bool toggle);
 
 void show_display(const String& header, const String& line1, const String& line2, int wait = 0);
@@ -9,4 +13,5 @@ void show_display(const String& header, const String& line1, const String& line2
 
 void startupScreen(const float &version);
 
+#endif
 #endif

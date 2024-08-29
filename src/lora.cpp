@@ -1,3 +1,4 @@
+#ifndef NO_LORA
 #include <RadioLib.h>
 #include <logger.h>
 #include <SPI.h>
@@ -199,3 +200,4 @@ namespace LoRa {
     }
 
 }
+#endif

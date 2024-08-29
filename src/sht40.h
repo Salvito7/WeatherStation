@@ -7,7 +7,9 @@ namespace SHT40 {
 
     void setup();
     void loop();
+    void pauseReadings();
+    void resumeReadings();
 
 }
 
-#endif
+#endif // SHT40_H

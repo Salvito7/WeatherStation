@@ -1,5 +1,12 @@
-#include "lora.h"
+#ifndef CONFIG_H
+#define CONFIG_H
 
-LoraType* getLoraTypes();
-LoraType* getLoraType(int index);
-void initLoRaTypes();
+#include <Arduino.h>
+
+#ifndef NO_LORA
+    #include "lora.h"
+    LoraType* getLoraTypes();
+    LoraType* getLoraType(int index);
+    void initLoRaTypes();
+#endif
+#endif
