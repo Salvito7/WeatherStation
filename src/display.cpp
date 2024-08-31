@@ -45,8 +45,6 @@ void display_toggle(bool toggle) {
     }
 }
 
-//maybe add a function to display line with cursor position
-
 void show_display(const String& header, const String& line1, const String& line2, int wait = 0) {
     if(disableDisplay) {
         return;
@@ -85,6 +83,30 @@ void show_display(const String& header, const String& line1, const String& line2
 
 void startupScreen(const float &version) {
     show_display(" WeatherStation", "      ", "443mHz", " Wifi: OFF", " BT: OFF", "  v" + String(version), 1500);
+}
+
+void showDirectory(const String& currentDir, const String& dirList) {
+    if(disableDisplay) {
+        return;
+    }
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 10);
+    u8g2.print("Dir: " + currentDir);
+    u8g2.setCursor(0, 20);
+    u8g2.print(dirList);
+    u8g2.sendBuffer();
+}
+
+void showStatus(const String& status) {
+    if(disableDisplay) {
+        return;
+    }
+    u8g2.clearBuffer();
+    u8g2.setCursor(0, 10);
+    u8g2.print("Status");
+    u8g2.setCursor(0, 20);
+    u8g2.print(status);
+    u8g2.sendBuffer();
 }
 
 #endif

@@ -1,4 +1,7 @@
+#include <SPI.h>
 #include <Arduino.h>
+#include <unordered_map>
+#include <string>
 #include <SensirionI2cSht4x.h>
 #include <Wire.h>
 #include <logger.h>
@@ -12,7 +15,9 @@
 #include "sdcard.h"
 #include "config.h"
 #include "boards_pinout.h"
-#include "command_handler.h"
+#include "cmdHandler.h"
+#include "errorHandler.h"
+#include "BLEHandler.h"
 
 #ifndef NO_DISPLAY
   #include "display.h"
@@ -26,17 +31,20 @@
   #include "lora.h"
 #endif
 
-
+#define MAX_ERROR_CODES 10
+#define DEBUG
 float version = 1.0;
 logging::Logger logger;
-CommandHandler commandHandler;
-#define DEBUG
+CMDHandler commandHandler;
+BLEHandler bleHandler;
+ErrorHandler errorHandler;
 
 extern String defaultFilename;
 extern bool disableLoRa;
 extern bool disableDisplay;
 extern bool disableSD;
 extern bool disableSHT40;
+extern bool disableBLE;
 
 int adc_value = 0;
 double voltage = 0.0;
@@ -49,12 +57,11 @@ void setup() {
       logger.setDebugLevel(logging::LoggerLevel::LOGGER_LEVEL_INFO);
   #endif
 
-  pinMode(15, OUTPUT);
-  delay(500);
-  digitalWrite(15, LOW);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
   Serial.println("Starting up...");
-  delay(1000);
-  digitalWrite(15, HIGH);
+  delay(500);
+  digitalWrite(LED_PIN, HIGH);
 
   logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Power", "Power setup");  
   POWER::setup();
@@ -62,6 +69,7 @@ void setup() {
   if(disableDisplay) {
     logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "Display", "Display is disabled from config");
   } else {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "Display", "Display setup");
     setup_display();
     display_toggle(true);
     startupScreen(version);
@@ -70,8 +78,15 @@ void setup() {
 
   logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "WiFi", "Disabling WiFi");
   WiFi.mode(WIFI_OFF);
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "BT", "Disabling Bluetooth");
-  esp_bt_controller_disable();
+
+  if(disableBLE) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "BLE", "Disabling BLE");
+    esp_bt_controller_disable();
+  } else {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "BLE", "BLE setup");
+    bleHandler.setup();
+  }
+  
   if(disableSHT40) {
     logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SHT40", "Disabling SHT40");
   } else {
@@ -117,6 +132,7 @@ void loop() {
 
   if(!disableSHT40) {
     SHT40::loop();
+    bleHandler.updateSensorValues(SHT40::getTemperature(), SHT40::getHumidity(), POWER::getBatteryVoltage());
   }
 
   #ifndef NO_SD
@@ -127,4 +143,5 @@ void loop() {
   #endif
   commandHandler.processCommands();
   POWER::batteryManager();
+  bleHandler.updateErrorCodes(errorHandler.getErrorCodes());
 }

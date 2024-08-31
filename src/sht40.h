@@ -9,6 +9,8 @@ namespace SHT40 {
     void loop();
     void pauseReadings();
     void resumeReadings();
+    float getTemperature();
+    float getHumidity();
 
 }
 

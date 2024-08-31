@@ -3,10 +3,10 @@
 
 #include <Arduino.h>
 
-class CommandHandler {
+class CMDHandler {
 public:
-    void setup();
     void processCommands();
+    void enterDeepSleep();
 
 private:
     void listDirectories();
@@ -14,12 +14,16 @@ private:
     void readDefaultFile();
     void displaySDCardInfo();
     void removeFile(const String& filename);
-    void enterDeepSleep();
+    
     void enableLoRa();
     void sendLoRaMessage(const String& message);
-    void changeDirectory(const String& dirname); 
-    void appendToFile(const String& filename, const String& data); 
+    void changeDirectory(const String& dirname);
+    void appendToFile(const String& filename, const String& data);
     void readFileInCurrentDir(const String& filename);
+    void showDirectoryOnDisplay();
+    void showStatusOnDisplay();
+    void scrollDirectoryUp();
+    void scrollDirectoryDown();
 };
 
 #endif // COMMAND_HANDLER_H

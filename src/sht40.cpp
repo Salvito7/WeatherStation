@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <logger.h>
 #include "config.h"
+#include "errorHandler.h"
 #ifndef NO_SD
     #include "sdcard.h"
 #endif
@@ -12,10 +13,13 @@
 
 SensirionI2cSht4x sensor;
 TwoWire I2C_SHT40 = TwoWire(0);
+extern ErrorHandler errorHandler;
 
 extern logging::Logger logger;
 extern bool disableSHT40;
 static char errorMessage[64];
+static float temperature = 0;
+static float humidity = 0;
 
 namespace SHT40 {
     
@@ -35,6 +39,7 @@ namespace SHT40 {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SHT40", errorMessage);
             disableSHT40 = true;
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SHT40", "Disabling SHT40");
+            errorHandler.addErrorCode("SHT40", "Error requesting serialNumber()");
             return;
         }
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SHT40", "Sensor serial number: ");
@@ -49,8 +54,6 @@ namespace SHT40 {
 
         if ((now - lastMillis) >= 5000) {
 
-            float temperature = 0;
-            float humidity = 0;
             int16_t error = sensor.measureHighPrecision(temperature, humidity);
             if (error != 0) {
                 Serial.print("Error trying to execute measure(): ");
@@ -79,5 +82,13 @@ namespace SHT40 {
     void resumeReadings() {
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SHT40", "Resuming SHT40 readings");
         disableSHT40 = false;
+    }
+
+    float getTemperature() {
+        return temperature;
+    }
+
+    float getHumidity() {
+        return humidity;
     }
 }

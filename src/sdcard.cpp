@@ -6,6 +6,8 @@
 #include "config.h"
 #include <logger.h>
 #include "boards_pinout.h"
+#include "errorHandler.h"
+#include "vfs_api.cpp"
 
 #ifdef TTGO_T_LORA32_V2_1
     int sck = 14;
@@ -32,6 +34,7 @@ extern String defaultFilename;
 static String dataBuffer;
 static bool noCard;
 static String currentDir = "/";
+extern ErrorHandler errorHandler;
 
 namespace SDCARD {
 
@@ -54,6 +57,7 @@ namespace SDCARD {
             SPI.begin(sck, miso, mosi, cs);
             if (!SD.begin(cs)) {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Card Mount Failed");
+                errorHandler.addErrorCode("SD", "Card Mount Failed");
                 noCard = true;
                 return;
             }
@@ -61,6 +65,7 @@ namespace SDCARD {
 
             if (cardType == CARD_NONE) {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD card attached");
+                errorHandler.addErrorCode("SD", "No SD card attached");
                 noCard = true;
                 return;
             }
@@ -107,9 +112,9 @@ namespace SDCARD {
         unsigned long now = millis();
         static unsigned long lastMillis2 = 0;
 
-        if (((now - lastMillis2) >= 2000)) {
+        if (((now - lastMillis2) >= 5000)) {
             lastMillis2 = now;
-            if(dataBuffer.length() < 48) {
+            if(dataBuffer.length() < 48) { //check if the buffer has 12 (lenght of a single data line from the sensor) x 4 bytes to avoid cutting off data
                 return;
             }
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
@@ -117,6 +122,8 @@ namespace SDCARD {
             File myFile = SD.open(defaultFilename, FILE_APPEND);
             if (!myFile) {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending");
+                errorHandler.addErrorCode("SD", "Failed to open file for appending");
+                //TODO add some way of detecting if the error is due to the filesystem not being mounted => remount
                 return;
             }
             if (myFile.print(dataBuffer)) {
@@ -125,6 +132,7 @@ namespace SDCARD {
                 digitalWrite(LED_PIN, LOW);
             } else {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
+                errorHandler.addErrorCode("SD", "Append failed");
             }
 
             dataBuffer = "";
@@ -138,6 +146,7 @@ namespace SDCARD {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "File opened with success!");
         } else {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Error opening file!");
+            errorHandler.addErrorCode("SD", "Error opening file");
         }
         return myFile;
     }
@@ -146,12 +155,14 @@ namespace SDCARD {
         File file = SD.open(path, FILE_APPEND);
         if (!file) {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending");
+            errorHandler.addErrorCode("SD", "Failed to open file for appending");
             return;
         }
         if (file.print(message)) {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Message appended to file");
         } else {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
+            errorHandler.addErrorCode("SD", "Append failed");
         }
         file.close();
     }
@@ -168,6 +179,7 @@ namespace SDCARD {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Data read with success!");
         } else {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Error reading data!");
+            errorHandler.addErrorCode("SD", "Error reading data");
         }
         return data;
     }
@@ -177,17 +189,20 @@ namespace SDCARD {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("File removed: " + String(path)).c_str());
         } else {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", ("Failed to remove file: " + String(path)).c_str());
+            errorHandler.addErrorCode("SD", "Failed to remove file");
         }
     }
 
-    void listDir(const char *dirname, uint8_t levels) {
+    void listDirTerminal(const char *dirname, uint8_t levels) {
         File root = SD.open(dirname);
         if (!root) {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", ("Failed to open directory: " + String(dirname)).c_str());
+            errorHandler.addErrorCode("SD", "Failed to open directory");
             return;
         }
         if (!root.isDirectory()) {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", (String(dirname) + " is not a directory").c_str());
+            errorHandler.addErrorCode("SD", "Not a directory");
             return;
         }
 
@@ -196,13 +211,41 @@ namespace SDCARD {
             if (file.isDirectory()) {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("DIR : " + String(file.name())).c_str());
                 if (levels) {
-                    listDir(file.name(), levels - 1);
+                    listDirTerminal(file.name(), levels - 1);
                 }
             } else {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("FILE: " + String(file.name()) + " SIZE: " + String(file.size())).c_str());
             }
             file = root.openNextFile();
         }
+    }
+    
+
+    String listDir(const char* dirname, int scrollIndex) {
+      File root = SD.open(dirname);
+      if (!root) {
+          return "Failed to open directory";
+      }
+      if (!root.isDirectory()) {
+          return "Not a directory";
+      }
+
+      String dirList = "";
+      int index = 0;
+      File file = root.openNextFile();
+      while (file) {
+          if (index >= scrollIndex && index < scrollIndex + 5) {
+              dirList += file.name();
+              dirList += "\n";
+          }
+          file = root.openNextFile();
+          index++;
+      }
+      return dirList;
+    }
+
+    String getCurrentDir() {
+        return currentDir;
     }
 
     void changeDir(const char* dirname) {
@@ -212,6 +255,7 @@ namespace SDCARD {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("Changed directory to: " + currentDir).c_str());
         } else {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", ("Failed to change directory to: " + String(dirname)).c_str());
+            errorHandler.addErrorCode("SD", "Failed to change directory");
         }
         dir.close();
     }
@@ -225,6 +269,7 @@ namespace SDCARD {
         uint8_t cardType = SD.cardType();
         if (cardType == CARD_NONE) {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD card attached");
+            errorHandler.addErrorCode("SD", "No SD card attached");
             return;
         }
 

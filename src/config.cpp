@@ -7,8 +7,11 @@ bool disableLoRa = true;
 bool disableDisplay = false;
 bool disableSD = false;
 bool disableSHT40 = false;
+bool disableBLE = false;
 
 String defaultFilename = "/test.txt";
+
+//TODO add more LoRa types and make this whole thing configuarble with a .json file from SPIFFS or SD card
 
 #ifndef NO_LORA
     static LoraType loraTypes[2];
@@ -22,7 +25,6 @@ String defaultFilename = "/test.txt";
         return &loraTypes[loraIndex];
     }
 
-    //TODO add more LoRa types that are read from .json file from SPIFFS or SD card
     void initLoRaTypes() {
         for (int i = 0; i < loraIndexSize; i++) {
             loraTypes[i] = { 0, 12, 125000, 5, 20 };

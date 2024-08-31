@@ -15,9 +15,11 @@ namespace SDCARD {
     void appendDataToBuffer(const String& data);
     File openFile(const char* filename);
     void removeFile(const char* filename);
-    void listDir(const char *dirname, uint8_t levels);
+    void listDirTerminal(const char *dirname, uint8_t levels);
+    String listDir(const char *dirname, int scrollIndex);
     void changeDir(const char* dirname);
-    String readTextFile(const char* filename);
+    String getCurrentDir();
+    String readFileInCurrentDir(const char* filename);
 }
 
 #endif
