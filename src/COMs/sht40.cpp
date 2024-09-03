@@ -4,9 +4,11 @@
 #include <logger.h>
 #include "config.h"
 #include "errorHandler.h"
+#include "BLEHandler.h"
 #ifndef NO_SD
     #include "sdcard.h"
 #endif
+#include <iostream>
 
 #define SHT40_SDA 32
 #define SHT40_SCL 33
@@ -14,9 +16,11 @@
 SensirionI2cSht4x sensor;
 TwoWire I2C_SHT40 = TwoWire(0);
 extern ErrorHandler errorHandler;
-
+extern BLEHandler bleHandler;
 extern logging::Logger logger;
 extern bool disableSHT40;
+extern bool disableSD;
+
 static char errorMessage[64];
 static float temperature = 0;
 static float humidity = 0;
@@ -53,24 +57,27 @@ namespace SHT40 {
         unsigned long now = millis();
 
         if ((now - lastMillis) >= 5000) {
-
-            int16_t error = sensor.measureHighPrecision(temperature, humidity);
+            lastMillis = now;
+            int16_t error = sensor.measureMediumPrecision(temperature, humidity);
             if (error != 0) {
                 Serial.print("Error trying to execute measure(): ");
                 errorToString(error, errorMessage, sizeof errorMessage);
                 Serial.println(errorMessage);
+                errorHandler.addErrorCode("SHT40", "Error trying to execute measure()");
                 return;
             }
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", ("Temperature: " + String(temperature) + " °C").c_str());
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", ("Temperature: " + String(temperature) + " C").c_str());
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", ("Humidity: " + String(humidity) + " %").c_str());
-            
+            double batteryVoltage = POWER::getBatteryVoltage();
+            bleHandler.updateSensorValues(&temperature, &humidity, &batteryVoltage);
+            Serial.println("SHT40: " + String(SHT40::getTemperature()) + " C, " + String(SHT40::getHumidity()) + " %");
             #ifndef NO_SD
+                if(!disableSD) {
                 SDCARD::appendDataToBuffer((String(temperature) + "," + String(humidity) + "\n").c_str());
+                }   
             #else
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", "SD card is disabled");
             #endif
-            
-            lastMillis = now;
         }
     }
 

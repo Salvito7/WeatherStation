@@ -168,7 +168,6 @@ namespace POWER {
                 lastMillis = now;
             }
 
-    
         #endif
         #if defined(HAS_AXP192) || defined(HAS_AXP2101)
             handleChargingLed();

@@ -32,9 +32,11 @@
 extern logging::Logger logger;
 extern String defaultFilename;
 static String dataBuffer;
-static bool noCard;
-static String currentDir = "/";
+extern bool disableSD;
 extern ErrorHandler errorHandler;
+
+static bool noSDCard = false;
+static String currentDir = "/";
 
 namespace SDCARD {
 
@@ -56,18 +58,17 @@ namespace SDCARD {
         #else
             SPI.begin(sck, miso, mosi, cs);
             if (!SD.begin(cs)) {
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Card Mount Failed");
-                errorHandler.addErrorCode("SD", "Card Mount Failed");
-                noCard = true;
-                return;
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD module");
+                errorHandler.addErrorCode("SD", "No SD module");
+                disableSD = true;
+                noSDCard = true;
             }
             uint8_t cardType = SD.cardType();
 
             if (cardType == CARD_NONE) {
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD card attached");
-                errorHandler.addErrorCode("SD", "No SD card attached");
-                noCard = true;
-                return;
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD card");
+                errorHandler.addErrorCode("SD", "No SD card");
+                noSDCard = true;
             }
 
             if(defaultFilename == "") {
@@ -82,61 +83,63 @@ namespace SDCARD {
     }
 
     void loop() {
-        if(!noCard) {
-            unsigned long now = millis();
-            static unsigned long lastMillis = 0;
+        if(!disableSD) {
+            if(noSDCard) {
+                unsigned long now = millis();
+                static unsigned long lastMillis = 0;
+                if ((now - lastMillis) >= 2000) {
+                    lastMillis = now;
+                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
 
-            if ((now - lastMillis) >= 2000) {
-                lastMillis = now;
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
-                SPI.begin(sck, miso, mosi, cs);
-                if(!SD.begin(cs)) {
-                    if(SD.cardType() == CARD_NONE) {
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SD", "Waiting for SD card...");
-                        noCard = true;
+                //   if(SD.begin(cs)) {
+                        if(SD.cardType() == CARD_NONE) {
+                            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SD", "Waiting for SD card...");
+                            noSDCard = true;
+                            return;
+                        } else {
+                            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "SD card inserted");
+                            noSDCard = false;
+                            return;
+                        }
+                /*   } else {
+                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Card Mount Failed");
+                        errorHandler.addErrorCode("SD", "Card Mount Failed");
+                        disableSD = true;
                         return;
-                    } else {
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "SD card inserted");
-                        noCard = false;
+                    }*/
+                }
+            } else {
+
+                unsigned long now = millis();
+                static unsigned long lastMillis = 0;
+
+                if (((now - lastMillis) >= 5000)) {
+                    lastMillis = now;
+                    if(dataBuffer.length() < 48) { //check if the buffer has 12 (lenght of a single data line from the sensor) x 4 bytes to avoid cutting off data
                         return;
                     }
-                } else {
-                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SD", "Waiting for SD card...");
-                    noCard = true;
-                    return;
+                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
+
+                    File myFile = SD.open(defaultFilename, FILE_APPEND);
+                    if (!myFile) {
+                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending");
+                        errorHandler.addErrorCode("SD", "Open file for appending failed");
+                        //TODO add some way of detecting if the error is due to the filesystem not being mounted => remount
+                        return;
+                    }
+                    if (myFile.print(dataBuffer)) {
+                        digitalWrite(LED_PIN, HIGH);
+                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Data appended to file");
+                        digitalWrite(LED_PIN, LOW);
+                    } else {
+                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
+                        errorHandler.addErrorCode("SD", "Append failed");
+                    }
+
+                    dataBuffer = "";
+                    myFile.close();
                 }
             }
-            return;
-        }
-
-        unsigned long now = millis();
-        static unsigned long lastMillis2 = 0;
-
-        if (((now - lastMillis2) >= 5000)) {
-            lastMillis2 = now;
-            if(dataBuffer.length() < 48) { //check if the buffer has 12 (lenght of a single data line from the sensor) x 4 bytes to avoid cutting off data
-                return;
-            }
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
-
-            File myFile = SD.open(defaultFilename, FILE_APPEND);
-            if (!myFile) {
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending");
-                errorHandler.addErrorCode("SD", "Failed to open file for appending");
-                //TODO add some way of detecting if the error is due to the filesystem not being mounted => remount
-                return;
-            }
-            if (myFile.print(dataBuffer)) {
-                digitalWrite(LED_PIN, HIGH);
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Data appended to file");
-                digitalWrite(LED_PIN, LOW);
-            } else {
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
-                errorHandler.addErrorCode("SD", "Append failed");
-            }
-
-            dataBuffer = "";
-            myFile.close();
         }
     }
 

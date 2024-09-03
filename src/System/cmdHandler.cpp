@@ -42,6 +42,11 @@ void CMDHandler::processCommands() {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sendlora <message> - Send LoRa message");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "cd <dirname> - Change directory");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "append <filename> <data> - Append data to file");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "readfile <filename> - Read file");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Error handling commands:");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "showerrors - Show error codes");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerrors - Clear error codes");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerror <errorcode> - Clear specific error code");
             #ifndef NO_DISPLAY
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "up - Scroll up");
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "down - Scroll down");
@@ -76,6 +81,11 @@ void CMDHandler::processCommands() {
             scrollDirectoryDown();
         } else if (command == "exit") {
             showStatusOnDisplay();
+        } else if (command == "clearerrors") {
+            errorHandler.clearAll();
+        } else if (command.startsWith("clearerror ")) {
+            String errorCode = command.substring(11);
+            errorHandler.clearErrorCode(errorCode.c_str());
         } else {
             if (command.startsWith("remove ")) {
                 String filename = command.substring(7);

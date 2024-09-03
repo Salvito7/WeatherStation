@@ -5,6 +5,9 @@ std::unordered_map<std::string, std::pair<std::string, int>> errorCodes;
 
 void ErrorHandler::addErrorCode(const std::string& errorCode, const std::string& errorDescription) {
     if(errorCodes.count(errorCode) > 0) {
+        if(errorCodes.count(errorCode) <= 10) {
+            return;
+        }
         errorCodes[errorCode].second++;
         return;
     }

@@ -132,16 +132,15 @@ void loop() {
 
   if(!disableSHT40) {
     SHT40::loop();
-    bleHandler.updateSensorValues(SHT40::getTemperature(), SHT40::getHumidity(), POWER::getBatteryVoltage());
   }
 
   #ifndef NO_SD
     if(!disableSD) {
-    // logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", "SD loop");
       SDCARD::loop();
     }
   #endif
   commandHandler.processCommands();
   POWER::batteryManager();
   bleHandler.updateErrorCodes(errorHandler.getErrorCodes());
+  delay(500);
 }
