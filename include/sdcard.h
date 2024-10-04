@@ -14,6 +14,7 @@ namespace SDCARD {
     void appendFile(const char* filename, const char* data);
     void appendDataToBuffer(const String& data);
     File openFile(const char* filename);
+    void closeDefaultFile();
     void removeFile(const char* filename);
     void listDirTerminal(const char *dirname, uint8_t levels);
     String listDir(const char *dirname, int scrollIndex);

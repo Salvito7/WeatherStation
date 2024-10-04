@@ -29,29 +29,41 @@ void CMDHandler::processCommands() {
 
         if (command == "help") {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Available commands:");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "list - List directories");
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Sensor commands:");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "readsensor - Read sensor values");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "psens - Pause sensor readings");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "rsens - Resume sensor readings");
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "File commands:");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "rdefault - Read default file");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sdinfo - Display SD card info");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sleep - Enter deep sleep for 5 seconds");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "enablelora - Enable LoRa");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "disablelora - Disable LoRa");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "remove <filename> - Remove file");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sendlora <message> - Send LoRa message");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "cd <dirname> - Change directory");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "append <filename> <data> - Append data to file");
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "readfile <filename> - Read file");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Error handling commands:");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "showerrors - Show error codes");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerrors - Clear error codes");
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerror <errorcode> - Clear specific error code");
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Directory commands:");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "list - List directories");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "cd <dirname> - Change directory");
             #ifndef NO_DISPLAY
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "up - Scroll up");
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "down - Scroll down");
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "exit - Exit to status screen");
             #endif
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "System commands:");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sleep - Enter deep sleep for 5 seconds");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "shutdown - Enter deep sleep for 4 hours");
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "LoRa commands:");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "sendlora <message> - Send LoRa message");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "enablelora - Enable LoRa");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "disablelora - Disable LoRa");
+
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "CMDHandler", "Error handling commands:");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "showerrors - Show error codes");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerrors - Clear error codes");
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "CMDHandler", "clearerror <errorcode> - Clear specific error code");
             return;
         
         } else if (command == "list") {
@@ -69,6 +81,8 @@ void CMDHandler::processCommands() {
             displaySDCardInfo();
         } else if (command == "sleep") {
             enterDeepSleep();
+        } else if (command == "shutdown") {
+            POWER::shutdown();
         } else if (command == "enablelora") {
             enableLoRa();
         } else if (command == "disablelora") {

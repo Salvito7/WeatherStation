@@ -4,6 +4,7 @@
 //TODO maybe switch to NimBLE for better performance and lower memory usage
 
 //TODO BLE not reporting correct values
+//BLE GATT characteristics uuids https://www.bluetooth.com/specifications/assigned-numbers/ and https://www.bluetooth.com/specifications/gss/ 
 
 BLEHandler::BLEHandler() : pServer(nullptr), pService(nullptr), pTemperatureCharacteristic(nullptr), pHumidityCharacteristic(nullptr), pVoltageCharacteristic(nullptr), pErrorCodesCharacteristic(nullptr), pDeepSleepCharacteristic(nullptr) {}
 
@@ -35,7 +36,7 @@ void BLEHandler::setup() {
     pHumidityCharacteristic->addDescriptor(new BLE2902());
 
     pVoltageCharacteristic = pService->createCharacteristic(
-        BLEUUID((uint16_t)0x2A19),
+        BLEUUID((uint16_t)0x2B18),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
     );
     pVoltageCharacteristic->addDescriptor(new BLE2902());
@@ -61,15 +62,44 @@ void BLEHandler::setup() {
     BLEDevice::startAdvertising();
 }
 
-void BLEHandler::updateSensorValues(float* temperature, float* humidity, double* voltage) {
-    pTemperatureCharacteristic->setValue(*temperature);
-    pTemperatureCharacteristic->notify();
+void BLEHandler::loop() {
+    //if there is a connection, notify the characteristics every 5 seconds
+    if (pServer != nullptr && pServer->getConnectedCount() > 0) {
+        unsigned long startTime = millis();
+        if (millis() - startTime >= 5000) {
+            pTemperatureCharacteristic->notify();
+            pHumidityCharacteristic->notify();
+            pVoltageCharacteristic->notify();
+            pErrorCodesCharacteristic->notify();
+        }
+    }
+}
 
-    pHumidityCharacteristic->setValue(*humidity);
-    pHumidityCharacteristic->notify();
+void BLEHandler::updateSensorValues() {
+    int temp = (int)(SHT40::getTemperature() * 100.0f);
+    uint16_t hum = SHT40::getHumidity() * 100.0f;
 
-    pVoltageCharacteristic->setValue(*voltage);
-    pVoltageCharacteristic->notify();
+   // uint16_t temp = (tempFloat >= -273.15f && tempFloat <= 327.67f) ? static_cast<uint16_t>(((tempFloat + 273.15f) / 600.82f) * 65535) : 0x8000;
+   // uint16_t hum = (humFloat >= 0.0f && humFloat <= 100.0f) ? static_cast<uint16_t>(humFloat * 655.35f) : 0xFFFF;
+    String volt = String(POWER::getBatteryVoltage());
+
+    if(temp == 0) {
+        temp = 0xFFFF;
+    } else if (hum == 0) {
+        hum = 0xFFFF;
+    }
+    
+    pTemperatureCharacteristic->setValue(temp);
+    pHumidityCharacteristic->setValue(hum);
+
+//The correct type for Voltage should be a uint16 according to SIG, but for me (using the nRF connect app) it doesn't work because it doesnt have the "Voltage" Characteristic built-in, so I'm sending the voltage as a string 
+  //  if(POWER::isBatteryConnected()) { 
+ //       volt = (uint16_t)POWER::getBatteryVoltage();
+  //  } else {
+  //      volt = 0xFFFF;
+  //  }
+    pVoltageCharacteristic->setValue(std::string((volt + " V").c_str()));
+    
 }
 
 void BLEHandler::updateErrorCodes(const std::unordered_map<std::string, std::pair<std::string, int>>& errorCodes) {
@@ -81,11 +111,10 @@ void BLEHandler::updateErrorCodes(const std::unordered_map<std::string, std::pai
             errorCodesStr += pair.first + ": " + pair.second.first + " " + std::to_string(pair.second.second) + "\n";
         }
         pErrorCodesCharacteristic->setValue(errorCodesStr);
-        pErrorCodesCharacteristic->notify();
     }
 }
 
 void BLEHandler::notifyDeepSleep(int time) {
     pDeepSleepCharacteristic->setValue("Entering deep sleep mode for " + std::to_string(time) + " seconds");
-    pDeepSleepCharacteristic;
+    pDeepSleepCharacteristic->notify();
 }

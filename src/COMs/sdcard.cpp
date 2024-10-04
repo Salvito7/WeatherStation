@@ -16,9 +16,9 @@
     int cs = 13;
 #endif
 #if defined(EXTERNAL_SD_MODULE) && !defined(TTGO_T_LORA32_V2_1) && !defined(TTGO_T_Beam_S3_SUPREME_V3)
-    int sck = 27;
+    int sck = 26;
     int miso = 25;
-    int mosi = 26;
+    int mosi = 27;
     int cs = 14;
 #endif
 
@@ -31,12 +31,13 @@
 
 extern logging::Logger logger;
 extern String defaultFilename;
-static String dataBuffer;
 extern bool disableSD;
 extern ErrorHandler errorHandler;
+extern bool disableTimeSync;
 
-static bool noSDCard = false;
+static String dataBuffer;
 static String currentDir = "/";
+static File logFile;
 
 namespace SDCARD {
 
@@ -58,89 +59,82 @@ namespace SDCARD {
         #else
             SPI.begin(sck, miso, mosi, cs);
             if (!SD.begin(cs)) {
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD module");
-                errorHandler.addErrorCode("SD", "No SD module");
-                disableSD = true;
-                noSDCard = true;
-            }
-            uint8_t cardType = SD.cardType();
-
-            if (cardType == CARD_NONE) {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No SD card");
                 errorHandler.addErrorCode("SD", "No SD card");
-                noSDCard = true;
+                disableSD = true;
             }
+            uint8_t cardType = SD.cardType();
 
             if(defaultFilename == "") {
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "No default filename set!");
                 logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Setting default filename to /default.txt");
-                defaultFilename = "/default.txt";
+                
+            } else if (defaultFilename.indexOf("%date%") != -1 || defaultFilename.indexOf("%time%") != -1) {
+                // Get current date and time
+                time_t now = time(nullptr);
+                struct tm *timeinfo = localtime(&now);
+
+                // Format the date and time as strings
+                char date[11];
+                char time[9];
+                strftime(date, sizeof(date), "%Y%m%d", timeinfo);
+                strftime(time, sizeof(time), "%H%M%S", timeinfo);
+                defaultFilename.replace("%date%", date);
+                defaultFilename.replace("%time%", time);
+                
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("Setting default filename to: " + defaultFilename).c_str());
             } 
 
-            File defaultFile = SD.open(defaultFilename, FILE_READ, true);
-            defaultFile.close();
+            // Create default file if it doesn't exist    
+            logFile = SD.open(defaultFilename, FILE_APPEND, true);
+
+            //add header 
+            if (!disableTimeSync) {
+                logFile.print("");
+                logFile.print("Date,Time,Temperature,Humidity\n");
+            } else {
+                logFile.print("");
+                logFile.print("Temperature,Humidity\n");
+            }
         #endif
     }
 
     void loop() {
         if(!disableSD) {
-            if(noSDCard) {
-                unsigned long now = millis();
-                static unsigned long lastMillis = 0;
-                if ((now - lastMillis) >= 2000) {
-                    lastMillis = now;
-                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
+            unsigned long now = millis();
+            static unsigned long lastMillis = 0;
 
-                //   if(SD.begin(cs)) {
-                        if(SD.cardType() == CARD_NONE) {
-                            logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SD", "Waiting for SD card...");
-                            noSDCard = true;
-                            return;
-                        } else {
-                            logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "SD card inserted");
-                            noSDCard = false;
-                            return;
-                        }
-                /*   } else {
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Card Mount Failed");
-                        errorHandler.addErrorCode("SD", "Card Mount Failed");
-                        disableSD = true;
-                        return;
-                    }*/
+            if (((now - lastMillis) >= 5000)) {
+                lastMillis = now;
+                if(dataBuffer.length() < 48) { //check if the buffer has 12 (lenght of a single data line from the sensor) x 4 bytes to avoid cutting off data
+                    return;
                 }
-            } else {
+                logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
 
-                unsigned long now = millis();
-                static unsigned long lastMillis = 0;
-
-                if (((now - lastMillis) >= 5000)) {
-                    lastMillis = now;
-                    if(dataBuffer.length() < 48) { //check if the buffer has 12 (lenght of a single data line from the sensor) x 4 bytes to avoid cutting off data
-                        return;
-                    }
-                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SD", ("Data buffer size: " + String(dataBuffer.length())).c_str());
-
-                    File myFile = SD.open(defaultFilename, FILE_APPEND);
-                    if (!myFile) {
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending");
-                        errorHandler.addErrorCode("SD", "Open file for appending failed");
-                        //TODO add some way of detecting if the error is due to the filesystem not being mounted => remount
-                        return;
-                    }
-                    if (myFile.print(dataBuffer)) {
-                        digitalWrite(LED_PIN, HIGH);
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Data appended to file");
-                        digitalWrite(LED_PIN, LOW);
-                    } else {
-                        logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
-                        errorHandler.addErrorCode("SD", "Append failed");
-                    }
-
-                    dataBuffer = "";
-                    myFile.close();
+                if (!logFile) {
+                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Failed to open file for appending. Reopening file");
+                    //errorHandler.addErrorCode("SD", "Open file for appending failed");
+                    logFile = SD.open(defaultFilename, FILE_APPEND);
+                    //TODO add some way of detecting if the error is due to the filesystem not being mounted => remount
+                    return;
                 }
+                if (logFile.print(dataBuffer)) {
+                    digitalWrite(LED_PIN, HIGH);
+                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Data appended to file");
+                    digitalWrite(LED_PIN, LOW);
+                } else {
+                    logger.log(logging::LoggerLevel::LOGGER_LEVEL_ERROR, "SD", "Append failed");
+                    errorHandler.addErrorCode("SD", "Append failed");
+                }
+
+                dataBuffer = "";
             }
         }
+    }
+
+    void closeDefaultFile() {
+        logFile.close();
+        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "File closed");
     }
 
     File openFile(const char* path) {
@@ -286,8 +280,9 @@ namespace SDCARD {
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", "Card Type: UNKNOWN");
         }
 
-        uint64_t cardSize = SD.cardSize() / (1024 * 1024);
+        uint64_t cardSize = SD.cardSize() / (1024 * 1024); //in MB
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("SD Card Size: " + String(cardSize) + "MB").c_str());
+        logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SD", ("Used space: " + String(SD.usedBytes()) + " bytes").c_str());
 
         #ifndef NO_DISPLAY
         // Display card info on screen if display is enabled

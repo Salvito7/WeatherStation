@@ -9,6 +9,17 @@ bool disableSD = false;
 bool disableSHT40 = false;
 bool disableBLE = false;
 
+// WiFi credentials
+String ssid = "ABC";
+String password = "123";
+
+// Set NTP server and time zone
+bool disableTimeStamps = false;
+bool disableTimeSync = true;
+String ntpServer1 = "pool.ntp.org";
+String ntpServer2 = "time.nist.gov";
+long gmtOffsetInSeconds = 7200; //GMT +2
+
 String defaultFilename = "/test.txt";
 
 //TODO add more LoRa types and make this whole thing configuarble with a .json file from SPIFFS or SD card

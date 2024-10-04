@@ -18,6 +18,7 @@
 #include "cmdHandler.h"
 #include "errorHandler.h"
 #include "BLEHandler.h"
+#include "time.h"
 
 #ifndef NO_DISPLAY
   #include "display.h"
@@ -30,14 +31,16 @@
 #ifndef NO_LORA
   #include "lora.h"
 #endif
+#include <timeSetup.h>
 
 #define MAX_ERROR_CODES 10
 #define DEBUG
-float version = 1.0;
+String version = "0.1beta";
 logging::Logger logger;
 CMDHandler commandHandler;
 BLEHandler bleHandler;
 ErrorHandler errorHandler;
+TimeSetup timeSetup;
 
 extern String defaultFilename;
 extern bool disableLoRa;
@@ -45,10 +48,7 @@ extern bool disableDisplay;
 extern bool disableSD;
 extern bool disableSHT40;
 extern bool disableBLE;
-
-int adc_value = 0;
-double voltage = 0.0;
-double result = 0.0;
+extern bool disableTimeSync;
 
 void setup() { 
   Serial.begin(115200);
@@ -58,10 +58,11 @@ void setup() {
   #endif
 
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
-  Serial.println("Starting up...");
-  delay(500);
   digitalWrite(LED_PIN, HIGH);
+  Serial.println("Starting up...");
+  Serial.println("Version: " + String(version));
+  delay(500);
+  digitalWrite(LED_PIN, LOW);
 
   logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Power", "Power setup");  
   POWER::setup();
@@ -76,8 +77,16 @@ void setup() {
   }
   #endif
 
-  logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "WiFi", "Disabling WiFi");
-  WiFi.mode(WIFI_OFF);
+  logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Time", ("Current time: " + timeSetup.getCurrentTime()).c_str());
+
+  if(disableTimeSync) {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "Time", "Time sync is disabled");
+  } else {
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "Time", "Time setup");
+    timeSetup.connectToWiFi();
+    while(!timeSetup.synchronizeTime()) {}
+    timeSetup.disconnectFromWiFi();
+  }
 
   if(disableBLE) {
     logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "BLE", "Disabling BLE");
@@ -138,7 +147,10 @@ void loop() {
     if(!disableSD) {
       SDCARD::loop();
     }
+  #else
+    logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "SD", "SD card is disabled");
   #endif
+  
   commandHandler.processCommands();
   POWER::batteryManager();
   bleHandler.updateErrorCodes(errorHandler.getErrorCodes());

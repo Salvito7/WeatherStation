@@ -70,7 +70,7 @@
         #define GPS_TX              34
     #endif
     #if defined(ESP32_DIY)
-        #define LED_PIN             15  // On board LED is PIN 15 but it is also used for Serial TX so its better to use external LED 
+        #define LED_PIN             15  // On board LED is PIN 15 but it is also used for Serial TX so its generally better to use external LED 
     #else
         #define LED_PIN             LED_BUILTIN
     #endif

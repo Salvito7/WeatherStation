@@ -4,6 +4,7 @@
 #include "power.h"
 #include "display.h"
 #include "logger.h"
+#include "sdcard.h"
 
 #if !defined(TTGO_T_Beam_S3_SUPREME_V3)
     #define I2C_SDA 21
@@ -152,7 +153,7 @@ namespace POWER {
                 batteryVoltage       = String(getBatteryVoltage(), 2);
             #endif
             batteryChargeDischargeCurrent = String(getBatteryChargeDischargeCurrent(), 0);
-            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "PWR", String(getBatteryVoltage()).c_str());
+            logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "PWR", ("Voltage: " + String(getBatteryVoltage()) + " V").c_str());
         }
     }
 
@@ -165,6 +166,7 @@ namespace POWER {
 
             if ((now - lastMillis) >= 5000) {
                 obtainBatteryInfo();
+              //  logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "PWR", ("Battery voltage: " + batteryVoltage + "V").c_str());
                 lastMillis = now;
             }
 
@@ -411,6 +413,7 @@ namespace POWER {
 
     void shutdown() {
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_WARN, "PWR", "SHUTDOWN !!!");
+        SDCARD::closeDefaultFile();
         #if defined(HAS_AXP192) || defined(HAS_AXP2101)
             display_toggle(false);
             PMU.shutdown();

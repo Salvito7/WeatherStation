@@ -8,7 +8,6 @@
 #ifndef NO_SD
     #include "sdcard.h"
 #endif
-#include <iostream>
 
 #define SHT40_SDA 32
 #define SHT40_SCL 33
@@ -20,10 +19,12 @@ extern BLEHandler bleHandler;
 extern logging::Logger logger;
 extern bool disableSHT40;
 extern bool disableSD;
+extern bool disableBLE;
+extern bool disableTimeStamps;
 
 static char errorMessage[64];
-static float temperature = 0;
-static float humidity = 0;
+static float temperature = 0.0;
+static float humidity = 0.0;
 
 namespace SHT40 {
     
@@ -31,7 +32,6 @@ namespace SHT40 {
 
     void setup() {  
         I2C_SHT40.begin(SHT40_SDA, SHT40_SCL); 
-
         sensor.begin(I2C_SHT40, SHT40_I2C_ADDR_44);
         sensor.softReset();
         delay(10);
@@ -48,6 +48,10 @@ namespace SHT40 {
         }
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SHT40", "Sensor serial number: ");
         logger.log(logging::LoggerLevel::LOGGER_LEVEL_INFO, "SHT40", String(serialNumber).c_str());
+        #ifndef NO_SD
+            if(!disableSD) {
+            }   
+        #endif
     }
 
     void loop() {
@@ -64,19 +68,18 @@ namespace SHT40 {
                 errorToString(error, errorMessage, sizeof errorMessage);
                 Serial.println(errorMessage);
                 errorHandler.addErrorCode("SHT40", "Error trying to execute measure()");
+                temperature = 0.0;
+                humidity = 0.0;
                 return;
             }
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", ("Temperature: " + String(temperature) + " C").c_str());
             logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", ("Humidity: " + String(humidity) + " %").c_str());
-            double batteryVoltage = POWER::getBatteryVoltage();
-            bleHandler.updateSensorValues(&temperature, &humidity, &batteryVoltage);
-            Serial.println("SHT40: " + String(SHT40::getTemperature()) + " C, " + String(SHT40::getHumidity()) + " %");
+            if(!disableBLE) bleHandler.updateSensorValues();
+            //Serial.println("SHT40: " + String(SHT40::getTemperature()) + " C, " + String(SHT40::getHumidity()) + " %");
             #ifndef NO_SD
                 if(!disableSD) {
-                SDCARD::appendDataToBuffer((String(temperature) + "," + String(humidity) + "\n").c_str());
+                    SDCARD::appendDataToBuffer((String(temperature) + "," + String(humidity) + "\n").c_str());
                 }   
-            #else
-                logger.log(logging::LoggerLevel::LOGGER_LEVEL_DEBUG, "SHT40", "SD card is disabled");
             #endif
         }
     }
